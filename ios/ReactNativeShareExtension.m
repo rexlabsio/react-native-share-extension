@@ -1,10 +1,14 @@
 #import "ReactNativeShareExtension.h"
 #import "React/RCTRootView.h"
 #import <MobileCoreServices/MobileCoreServices.h>
+#import <Contacts/CNContactVCardSerialization.h>
+#import <Contacts/Contacts.h>
+
 
 #define URL_IDENTIFIER @"public.url"
 #define IMAGE_IDENTIFIER @"public.image"
 #define TEXT_IDENTIFIER (NSString *)kUTTypePlainText
+#define CONTACT_IDENTIFIER @"public.vcard"
 
 NSExtensionContext* extensionContext;
 
@@ -68,6 +72,7 @@ RCT_REMAP_METHOD(data,
         __block NSItemProvider *urlProvider = nil;
         __block NSItemProvider *imageProvider = nil;
         __block NSItemProvider *textProvider = nil;
+        __block NSItemProvider *contactProvider = nil;
 
         [attachments enumerateObjectsUsingBlock:^(NSItemProvider *provider, NSUInteger idx, BOOL *stop) {
             if([provider hasItemConformingToTypeIdentifier:URL_IDENTIFIER]) {
@@ -78,6 +83,9 @@ RCT_REMAP_METHOD(data,
                 *stop = YES;
             } else if ([provider hasItemConformingToTypeIdentifier:IMAGE_IDENTIFIER]){
                 imageProvider = provider;
+                *stop = YES;
+            } else if ([provider hasItemConformingToTypeIdentifier:CONTACT_IDENTIFIER]){
+                contactProvider = provider;
                 *stop = YES;
             }
         }];
@@ -127,6 +135,19 @@ RCT_REMAP_METHOD(data,
                     callback(text, @"text/plain", nil);
                 }
             }];
+        } else if (contactProvider) {
+                        [contactProvider loadItemForTypeIdentifier:CONTACT_IDENTIFIER options:nil completionHandler:^(NSData *vCardData, NSError *error) {
+                            NSLog(@"%@", vCardData);
+
+                            NSArray *contacts = [CNContactVCardSerialization contactsWithData:vCardData error:nil];
+                            for (CNContact *contact in contacts) {
+
+                                if(callback) {
+                                    callback([NSString stringWithFormat: @"{\"firstName\": \"%@\", \"lastName\": \"%@\", \"phone\": \"%@\", \"email\": \"%@\"}", contact.givenName, contact.familyName, contact.phoneNumbers.firstObject.value.stringValue, contact.emailAddresses.firstObject.value], @"text/plain", nil);
+                                }
+                            }
+                            
+                        }];
         } else {
             if(callback) {
                 callback(nil, nil, [NSException exceptionWithName:@"Error" reason:@"couldn't find provider" userInfo:nil]);

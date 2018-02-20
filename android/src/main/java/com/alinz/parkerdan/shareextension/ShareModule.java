@@ -11,8 +11,11 @@ import android.app.Activity;
 import android.content.Intent;
 import android.net.Uri;
 
-import android.graphics.Bitmap;
-import java.io.InputStream;
+
+import java.io.BufferedReader;
+
+import java.io.IOException;
+import java.io.InputStreamReader;
 
 
 public class ShareModule extends ReactContextBaseJavaModule {
@@ -36,7 +39,7 @@ public class ShareModule extends ReactContextBaseJavaModule {
   public void data(Promise promise) {
       promise.resolve(processIntent());
   }
-
+ 
   public WritableMap processIntent() {
       WritableMap map = Arguments.createMap();
 
@@ -59,10 +62,32 @@ public class ShareModule extends ReactContextBaseJavaModule {
         else if (Intent.ACTION_SEND.equals(action) && ("image/*".equals(type) || "image/jpeg".equals(type) || "image/png".equals(type) || "image/jpg".equals(type) ) ) {
           Uri uri = (Uri) intent.getParcelableExtra(Intent.EXTRA_STREAM);
          value = "file://" + RealPathUtil.getRealPathFromURI(currentActivity, uri);
+       } else if (Intent.ACTION_SEND.equals(action) && "text/x-vcard".equals(type)) {
+            Uri uri = (Uri) intent.getParcelableExtra(Intent.EXTRA_STREAM);
+
+            //read whole file to string
+            BufferedReader reader = null;
+            try {
+                reader = new BufferedReader(new InputStreamReader(
+                        currentActivity.getContentResolver().openInputStream(uri), "UTF-8"));
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+            String line;
+            try {
+                while ((line = reader.readLine()) != null) {
+                    value += line + "\r\n";
+                }
+            reader.close();
+
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
 
        } else {
          value = "";
-       }
+       }      
       } else {
         value = "";
         type = "";
